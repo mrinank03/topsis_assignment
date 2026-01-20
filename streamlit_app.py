@@ -112,17 +112,25 @@ def send_email_with_sendgrid(recipient_email: str, df, weights: str, impacts: st
         "Content-Type": "application/json"
     }
     
-    response = requests.post(
-        "https://api.sendgrid.com/v3/mail/send",
-        json=payload,
-        headers=headers
-    )
-    
-    if response.status_code != 202:
-        error_msg = response.text if response.text else f"Status code: {response.status_code}"
-        raise Exception(f"SendGrid API error: {error_msg}")
-    
-    return True
+    try:
+        response = requests.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            json=payload,
+            headers=headers,
+            timeout=10
+        )
+        
+        if response.status_code == 202:
+            print(f"✅ Email sent to {recipient_email}")
+            return True
+        else:
+            # Detailed error message
+            error_msg = response.text if response.text else f"Status code: {response.status_code}"
+            print(f"❌ SendGrid Error ({response.status_code}): {error_msg}")
+            raise Exception(f"SendGrid API error:\n{error_msg}\n\nCommon fixes:\n1. Verify SENDGRID_API_KEY is correct\n2. Verify SENDER_EMAIL is a verified sender in SendGrid\n3. Check SendGrid account hasn't hit rate limits\n4. Go to SendGrid dashboard to check error logs")
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Request error: {str(e)}")
+        raise Exception(f"Network error sending email: {str(e)}\n\nChecklist:\n1. Check internet connection\n2. Check SendGrid API status\n3. Verify firewall isn't blocking requests")
 
 # Page configuration
 st.set_page_config(
