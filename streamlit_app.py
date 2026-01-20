@@ -3,11 +3,126 @@ import pandas as pd
 import io
 import os
 from dotenv import load_dotenv
-from email_service import send_email_with_attachment
 import numpy as np
+import requests
 
-# Load environment variables
+# Load environment variables (for local development)
 load_dotenv()
+
+def send_email_with_sendgrid(recipient_email: str, df, weights: str, impacts: str):
+    """
+    Send TOPSIS results using SendGrid API (works on Streamlit Cloud)
+    """
+    api_key = st.secrets.get("SENDGRID_API_KEY") or os.getenv("SENDGRID_API_KEY")
+    sender_email = st.secrets.get("SENDER_EMAIL") or os.getenv("SENDER_EMAIL")
+    
+    if not api_key:
+        raise ValueError("SENDGRID_API_KEY not found. Add it to Streamlit Cloud Secrets or .env file.")
+    if not sender_email:
+        raise ValueError("SENDER_EMAIL not found. Add it to Streamlit Cloud Secrets or .env file.")
+    
+    # Build email body
+    body_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+            .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+            .header {{ background-color: #007bff; color: white; padding: 20px; border-radius: 5px; }}
+            .content {{ padding: 20px; }}
+            .info {{ background-color: #f0f0f0; padding: 10px; margin: 10px 0; border-left: 4px solid #007bff; }}
+            table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
+            th, td {{ border: 1px solid #ddd; padding: 12px; text-align: left; }}
+            th {{ background-color: #007bff; color: white; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🎯 TOPSIS Analysis Results</h1>
+            </div>
+            <div class="content">
+                <p>Hello,</p>
+                <p>Your TOPSIS analysis has been completed successfully.</p>
+                
+                <div class="info">
+                    <strong>Analysis Configuration:</strong><br>
+                    Weights: {weights}<br>
+                    Impacts: {impacts}
+                </div>
+                
+                <h3>Summary Statistics:</h3>
+                <ul>
+                    <li><strong>Best Score:</strong> {df['Topsis Score'].max():.4f}</li>
+                    <li><strong>Worst Score:</strong> {df['Topsis Score'].min():.4f}</li>
+                    <li><strong>Average Score:</strong> {df['Topsis Score'].mean():.4f}</li>
+                    <li><strong>Total Alternatives:</strong> {len(df)}</li>
+                </ul>
+                
+                <h3>Top 3 Alternatives:</h3>
+                <table>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Alternative</th>
+                        <th>Score</th>
+                    </tr>
+    """
+    
+    # Add top 3
+    top_3 = df.nsmallest(3, 'Rank')[['Alternative', 'Topsis Score', 'Rank']].sort_values('Rank')
+    for idx, row in top_3.iterrows():
+        body_html += f"""
+                    <tr>
+                        <td>#{int(row['Rank'])}</td>
+                        <td>{row['Alternative']}</td>
+                        <td>{row['Topsis Score']:.4f}</td>
+                    </tr>
+        """
+    
+    body_html += """
+                </table>
+                <p>Thank you for using TOPSIS Decision Support Tool!</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    # SendGrid API payload
+    payload = {
+        "personalizations": [
+            {
+                "to": [{"email": recipient_email}],
+                "subject": "Your TOPSIS Analysis Results"
+            }
+        ],
+        "from": {"email": sender_email, "name": "TOPSIS Tool"},
+        "content": [
+            {
+                "type": "text/html",
+                "value": body_html
+            }
+        ]
+    }
+    
+    # Send via SendGrid API
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    
+    response = requests.post(
+        "https://api.sendgrid.com/v3/mail/send",
+        json=payload,
+        headers=headers
+    )
+    
+    if response.status_code != 202:
+        error_msg = response.text if response.text else f"Status code: {response.status_code}"
+        raise Exception(f"SendGrid API error: {error_msg}")
+    
+    return True
 
 # Page configuration
 st.set_page_config(
@@ -158,7 +273,7 @@ if st.button("🚀 Run TOPSIS", use_container_width=True):
                     if email_input.strip():
                         if st.button("📧 Send Results to Email", use_container_width=True):
                             try:
-                                send_email_with_attachment(
+                                send_email_with_sendgrid(
                                     email_input.strip(),
                                     df,
                                     weights_input,
@@ -167,6 +282,7 @@ if st.button("🚀 Run TOPSIS", use_container_width=True):
                                 st.success(f"✅ Results sent successfully to {email_input.strip()}")
                             except Exception as e:
                                 st.error(f"❌ Failed to send email: {str(e)}")
+                                st.info("📋 Setup Instructions:\n1. Get SendGrid API key: https://sendgrid.com\n2. Go to Streamlit Cloud Dashboard → App Settings → Secrets\n3. Add: `SENDGRID_API_KEY = 'SG.xxxxx'`\n4. Add: `SENDER_EMAIL = 'your@email.com'`")
                     
                     # Show statistics
                     st.subheader("📈 Statistics")
