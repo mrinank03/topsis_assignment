@@ -157,6 +157,12 @@ st.markdown("""
 st.title("🎯 TOPSIS Decision Support Tool")
 st.markdown("---")
 
+# Initialize session state
+if "topsis_results" not in st.session_state:
+    st.session_state.topsis_results = None
+if "email_sent" not in st.session_state:
+    st.session_state.email_sent = False
+
 # Create columns for layout
 col1, col2 = st.columns([1, 1])
 
@@ -260,57 +266,74 @@ if st.button("🚀 Run TOPSIS", use_container_width=True):
                     df['Topsis Score'] = np.round(score, 6)
                     df['Rank'] = df['Topsis Score'].rank(method='max', ascending=False).astype(int)
                     
-                    # Display results
-                    st.success("✅ TOPSIS calculation completed successfully!")
-                    
-                    # Show results table
-                    st.subheader("📊 Results")
-                    st.dataframe(df, use_container_width=True)
-                    
-                    # Download results
-                    csv_results = df.to_csv(index=False)
-                    st.download_button(
-                        label="📥 Download Results as CSV",
-                        data=csv_results,
-                        file_name="topsis_results.csv",
-                        mime="text/csv",
-                        use_container_width=True
-                    )
-                    
-                    # Send email if provided
-                    if email_input.strip():
-                        if st.button("📧 Send Results to Email", use_container_width=True):
-                            try:
-                                send_email_with_sendgrid(
-                                    email_input.strip(),
-                                    df,
-                                    weights_input,
-                                    impacts_input
-                                )
-                                st.success(f"✅ Results sent successfully to {email_input.strip()}")
-                            except Exception as e:
-                                st.error(f"❌ Failed to send email: {str(e)}")
-                                st.info("📋 Setup Instructions:\n1. Get SendGrid API key: https://sendgrid.com\n2. Go to Streamlit Cloud Dashboard → App Settings → Secrets\n3. Add: `SENDGRID_API_KEY = 'SG.xxxxx'`\n4. Add: `SENDER_EMAIL = 'your@email.com'`")
-                    
-                    # Show statistics
-                    st.subheader("📈 Statistics")
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.metric("Best Score", f"{df['Topsis Score'].max():.4f}")
-                    with col2:
-                        st.metric("Worst Score", f"{df['Topsis Score'].min():.4f}")
-                    with col3:
-                        st.metric("Average Score", f"{df['Topsis Score'].mean():.4f}")
-                    
-                    # Show ranking
-                    st.subheader("🏆 Rankings")
-                    ranking_df = df[['Alternative', 'Topsis Score', 'Rank']].sort_values('Rank')
-                    for idx, row in ranking_df.iterrows():
-                        medal = "🥇" if row['Rank'] == 1 else "🥈" if row['Rank'] == 2 else "🥉" if row['Rank'] == 3 else f"#{row['Rank']}"
-                        st.write(f"{medal} **{row['Alternative']}** - Score: {row['Topsis Score']:.4f}")
+                    # Store in session state
+                    st.session_state.topsis_results = {
+                        'df': df,
+                        'weights': weights_input,
+                        'impacts': impacts_input,
+                        'email': email_input.strip()
+                    }
+                    st.session_state.email_sent = False
 
         except Exception as e:
             st.error(f"❌ Error: {str(e)}")
+
+# Display results if they exist in session state
+if st.session_state.topsis_results is not None:
+    results = st.session_state.topsis_results
+    df = results['df']
+    
+    st.success("✅ TOPSIS calculation completed successfully!")
+    
+    # Show results table
+    st.subheader("📊 Results")
+    st.dataframe(df, use_container_width=True)
+    
+    # Download results
+    csv_results = df.to_csv(index=False)
+    st.download_button(
+        label="📥 Download Results as CSV",
+        data=csv_results,
+        file_name="topsis_results.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+    
+    # Email section
+    if results['email']:
+        st.markdown("---")
+        st.subheader("📧 Send Results via Email")
+        
+        if st.button("📧 Send Results to Email", use_container_width=True):
+            try:
+                send_email_with_sendgrid(
+                    results['email'],
+                    df,
+                    results['weights'],
+                    results['impacts']
+                )
+                st.session_state.email_sent = True
+                st.success(f"✅ Results sent successfully to {results['email']}")
+            except Exception as e:
+                st.error(f"❌ Failed to send email: {str(e)}")
+                st.info("📋 Setup Instructions:\n1. Get SendGrid API key: https://sendgrid.com\n2. Go to Streamlit Cloud Dashboard → App Settings → Secrets\n3. Add: `SENDGRID_API_KEY = 'SG.xxxxx'`\n4. Add: `SENDER_EMAIL = 'your@email.com'`\n\n**Important:** Verify your sender email in SendGrid first!")
+    
+    # Show statistics
+    st.subheader("📈 Statistics")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Best Score", f"{df['Topsis Score'].max():.4f}")
+    with col2:
+        st.metric("Worst Score", f"{df['Topsis Score'].min():.4f}")
+    with col3:
+        st.metric("Average Score", f"{df['Topsis Score'].mean():.4f}")
+    
+    # Show ranking
+    st.subheader("🏆 Rankings")
+    ranking_df = df[['Alternative', 'Topsis Score', 'Rank']].sort_values('Rank')
+    for idx, row in ranking_df.iterrows():
+        medal = "🥇" if row['Rank'] == 1 else "🥈" if row['Rank'] == 2 else "🥉" if row['Rank'] == 3 else f"#{row['Rank']}"
+        st.write(f"{medal} **{row['Alternative']}** - Score: {row['Topsis Score']:.4f}")
 
 st.markdown("---")
 st.markdown("""
