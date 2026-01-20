@@ -17,6 +17,28 @@ This Python package provides a straightforward implementation of the TOPSIS (Tec
 
 #### Usage
 
+##### Web Interface (Recommended)
+
+To use the interactive Streamlit web interface:
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the Streamlit app
+streamlit run streamlit_app.py
+```
+
+The app will open in your browser at `http://localhost:8501`
+
+**Features:**
+- Upload CSV files with drag-and-drop
+- Download sample CSV files
+- Input weights and impacts interactively
+- View results in a formatted table
+- Send results via email (optional)
+- Download results as CSV
+
 ##### Command-Line Interface
 
 To execute TOPSIS, use the following command:
@@ -70,6 +92,29 @@ The output file will contain the original data along with two additional columns
 
 * `Topsis Score`: The calculated TOPSIS score for each alternative.
 * `Rank`: The rank of each alternative based on the TOPSIS score (1 = best).
+
+## Email Configuration
+
+To enable email functionality in the Streamlit app:
+
+1. **For Gmail:**
+   - Enable 2-Factor Authentication on your Google Account
+   - Generate an App Password: https://myaccount.google.com/apppasswords
+   - Copy the generated password
+
+2. **Configure .env file:**
+   - Copy `.env.example` to `.env`
+   - Update with your email and app password:
+   ```
+   SENDER_EMAIL=your_email@gmail.com
+   SENDER_PASSWORD=your_app_password_here
+   SMTP_SERVER=smtp.gmail.com
+   SMTP_PORT=587
+   ```
+
+3. **For other email providers:**
+   - Outlook: smtp-mail.outlook.com, port 587
+   - Yahoo: smtp.mail.yahoo.com, port 587
 
 ## Error Handling
 
